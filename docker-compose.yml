@@ -1,0 +1,25 @@
+# Docker Compose 示例：本地或服务器部署
+# 环境变量不写进仓库，通过 env_file 或 environment 注入
+
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    # 方式一：使用宿主机上的 .env 文件（不提交到 git，部署时在服务器创建）
+    env_file:
+      - .env
+    # 方式二：也可直接写变量（适合 CI/少量变量，敏感值建议用 env_file 或 secrets）
+    # environment:
+    #   - NODE_ENV=production
+    #   - MOTIA_WORKBENCH_AUTH_USER=${MOTIA_WORKBENCH_AUTH_USER}
+    #   - MOTIA_WORKBENCH_AUTH_PASSWORD=${MOTIA_WORKBENCH_AUTH_PASSWORD}
+    # 若需 Redis（Motia 默认可能连本地 Redis）
+    # environment:
+    #   - MOTIA_REDIS_HOST=redis
+    # depends_on:
+    #   - redis
+  # redis:
+  #   image: redis:7-alpine
+  #   ports:
+  #     - "6379:6379"

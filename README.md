@@ -1,77 +1,147 @@
-# motia-bootcamp
+# Pharos Airdrop Executor
 
-This is a **Motia** project bootstrapped with the Motia CLI.
+基于 [Motia](https://motia.dev) 的 Pharos 签到与任务执行系统，支持多钱包、定时签到、发交易、任务验证与 Telegram 通知。开源可自部署，适合参与 Pharos 测试网撸毛与自动化任务。
 
-Motia lets you build APIs, background jobs, workflows, and event-driven systems in a single unified backend.
+---
 
-## Quick Start
+## 功能概览
+
+- **多钱包管理**：钱包信息存 Supabase，私钥加密存储（AES-256-GCM），支持从助记词/私钥加密后入库
+- **Pharos 全流程**：登录 → 签到 → 拉取积分 → 领水（已绑定 X 时）→ 查余额 → 发交易 → 等确认 → 任务验证 → 再拉一次积分
+- **单步容错**：签到/领水/拉 profile 失败不阻塞后续步骤，失败原因用接口返回的 `msg` 打日志
+- **定时与手动**：Cron 每日定时为所有钱包执行签到；支持 HTTP 接口手动触发指定钱包
+- **Telegram 通知**：全流程结束后发送一条汇总消息（登录、签到、积分、领水、发交易笔数、验证结果）
+- **Workbench**：Motia 自带可视化与日志，便于调试与观察流程
+
+---
+
+## 文档与代码结构
+
+| 路径 | 说明 |
+|------|------|
+| [docs/wallets-schema.sql](docs/wallets-schema.sql) | 钱包表结构（PostgreSQL/Supabase），含加密列说明与索引 |
+| [.github/workflows/deploy.yml](.github/workflows/deploy.yml) | CI：用 Secrets 生成 .env、构建镜像、可选部署到 VPS |
+| [AGENTS.md](AGENTS.md) | 面向 AI 助手的 Motia 项目说明与规则索引 |
+| [.cursor/rules/](.cursor/rules/) | Motia 步骤、API、Event、Cron 等开发规范（可选阅读） |
+
+**主要代码目录：**
+
+```
+src/
+├── api/                    # HTTP 接口
+│   └── wallet-encrypt.step.ts   # POST /wallet/encrypt 加密私钥/助记词
+├── modules/pharos/         # Pharos 流程
+│   ├── checkin.step.ts         # 签到事件处理（登录、签到、领水、发交易、验证、通知）
+│   ├── schedule.cron.step.ts   # 定时触发（每日）
+│   └── trigger-checkin.step.ts # POST /pharos/checkin 手动触发
+├── repositories/          # 数据访问
+│   └── wallet.repository.ts
+├── services/              # 业务与外部 API
+│   ├── pharos.client.ts       # Pharos API 封装（登录、签到、profile、领水、verifyTask）
+│   ├── notification.ts        # Telegram 汇总消息
+│   └── ethereum.ts
+└── utils/                 # 通用工具（HTTP、ethers、加解密、UA、Telegram）
+```
+
+---
+
+## 快速开始
+
+### 环境要求
+
+- **Node.js** 18+
+- **Redis**（Motia 事件队列，本地可用内存模式）
+- **Supabase** 项目（存钱包表）
+- **Pharos 相关**：RPC、API Base、Domain 等（见下方环境变量）
+
+### 1. 克隆与安装
 
 ```bash
-# Start the development server
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
+git clone https://github.com/unodrop/airdrop-motia-executor.git
+cd airdrop-motia-executor
+bun install
 ```
 
-This starts the Motia runtime and **Workbench**. Workbench is a tool for visualizing and debugging your workflows. By default, it's available at [`http://localhost:3000`](http://localhost:3000).
+### 2. 数据库
 
-You can start editing the project by making changes to `src/petstore/api` as well as produce your own `.step.ts`, `.step.js`, or `_step.py` files within the `src/` directory.
+在 Supabase 的 SQL Editor 中执行 [docs/wallets-schema.sql](docs/wallets-schema.sql)，创建 `wallets` 表。
 
-Motia auto-discovers all step files and executes them as defined in each step's configuration. Learn more about the power and simplicity of steps in the [Step Docs](https://motia.dev/docs/concepts/steps).
+### 3. 环境变量
 
-## Project Config
+复制并编辑 `.env`（不要提交到 Git）：
 
-The `motia.config.ts` file is the central configuration for your Motia application. Here you can customize Express, configure Redis, add security middleware, handle file uploads, set up stream authentication, and more.
+```bash
+# Motia Workbench 登录（可选，不设则无 Basic Auth）
+MOTIA_WORKBENCH_AUTH_USER=admin
+MOTIA_WORKBENCH_AUTH_PASSWORD=your_password
 
-## 环境变量与部署
+# 钱包私钥/助记词加密密钥（与 docs 中 WALLET_KEY 对应）
+ENCRYPTED_KEY=your_base64_or_hex_key
 
-环境变量不要提交到 GitHub（`.env`、`.env.local` 已在 `.gitignore` 中）。敏感值用 **GitHub Secrets** 存，由 CI 在部署时注入。
+# Redis（不设则使用 Motia 内置内存 Redis）
+REDIS_URL=redis://localhost:6379
 
-### 1. 在仓库里配置 GitHub Secrets
+# Pharos
+PHAROS_CHAIN_ID=688689
+PHAROS_RPC_URL=https://your-pharos-rpc
+PHAROS_DOMAIN=testnet.pharosnetwork.xyz
+PHAROS_API_BASE=https://api.pharosnetwork.xyz
+PHAROS_INVITE_CODE=your_invite_code
 
-仓库 → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**，按 `.env.example` 里用到的变量逐个添加，例如：
+# Supabase
+SUPABASE_URL=https://xxx.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 
-| Secret 名称 | 说明 |
-|-------------|------|
-| `MOTIA_WORKBENCH_AUTH_USER` | Workbench 登录用户名 |
-| `MOTIA_WORKBENCH_AUTH_PASSWORD` | Workbench 登录密码 |
-| `SUPABASE_URL` | Supabase 项目 URL |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key |
-| `PHAROS_API_BASE` / `PHAROS_APL_BASE` | Pharos API 地址 |
-| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | Telegram 通知（如需要） |
-| … | 其他见 `.env.example` |
-
-### 2. CI 里用 Secrets 注入（GitHub Actions）
-
-在 workflow 里用 Secrets 生成 `.env` 再交给 Docker，例如：
-
-```yaml
-env:
-  MOTIA_WORKBENCH_AUTH_USER: ${{ secrets.MOTIA_WORKBENCH_AUTH_USER }}
-  MOTIA_WORKBENCH_AUTH_PASSWORD: ${{ secrets.MOTIA_WORKBENCH_AUTH_PASSWORD }}
-  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-  SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-  # ... 其他变量
-
-run: |
-  echo "MOTIA_WORKBENCH_AUTH_USER=$MOTIA_WORKBENCH_AUTH_USER" >> .env
-  echo "MOTIA_WORKBENCH_AUTH_PASSWORD=$MOTIA_WORKBENCH_AUTH_PASSWORD" >> .env
-  # ... 其余变量
-  docker compose up -d --build
+# Telegram 汇总通知（可选）
+TELEGRAM_BOT_TOKEN=your_bot_token
+TELEGRAM_CHAT_ID=your_chat_id
 ```
 
-或部署到 VPS：在 CI 里用 Secrets 生成 `.env`，SCP 到服务器后执行 `docker compose up`。仓库里已有一份示例 workflow：**`.github/workflows/deploy.yml`**。需在 **Secrets** 里配置 `MOTIA_WORKBENCH_*`、`SUPABASE_*`、`PHAROS_*` 等；启用 deploy-vps 时还需 Secrets：`VPS_HOST`、`VPS_USERNAME`、`VPS_PASSWORD`；在 **Variables** 里设 `DEPLOY_VPS=true`（可选 `DEPLOY_PATH`，默认 `~/app`）。
+### 4. 运行
 
-### 3. 本地 / 自建 VPS 不用 CI 时
+```bash
+bun run dev
+```
 
-- **本地**：复制 `.env.example` 为 `.env` 或 `.env.local`，填好本地用的值（不提交）。
-- **VPS 手动部署**：在服务器上创建 `.env`（或从本机 SCP 上去），再 `docker compose up -d --build` 或 `docker run --env-file .env ...`。
+浏览器打开 [http://localhost:3000](http://localhost:3000) 进入 Motia Workbench，可查看流程与日志。
 
-## Learn More
+---
 
-- [Docs](https://motia.dev/docs) - Complete guides and API reference
-- [Quick Start Tutorial](https://motia.dev/docs/getting-started/quick-start) - Detailed getting started tutorial
-- [Core Concepts](https://motia.dev/docs/concepts/overview) - Learn about Steps and Motia's architecture
-- [Discord Community](https://discord.gg/motia) - Get help and connect with other developers
+## 提供的接口
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/pharos/checkin` | 手动触发一次签到。Body: `{ "id": "钱包 UUID" }`，UUID 为 Supabase `wallets.id` |
+| POST | `/wallet/encrypt` | 加密私钥/助记词。Body: `{ "private_key": "0x...", "mnemonic": "word1 word2 ..." }` 至少传一个；返回 `encrypted_private_key` / `encrypted_mnemonic`（与表内加密列格式一致） |
+
+---
+
+## 部署
+
+- **Docker**：项目根目录有 `Dockerfile` 与 `docker-compose.yml`，通过 `env_file: .env` 注入环境变量。
+- **GitHub Actions**：`.github/workflows/deploy.yml` 在 push 到 `main` 或手动触发时，用 **Secrets** 生成 `.env` 并构建镜像；若在仓库 **Variables** 中设 `DEPLOY_VPS=true`，会再执行 deploy-vps job，将代码与 .env 拷贝到 VPS 并执行 `docker compose up -d --build`。VPS 需配置 Secrets：`VPS_HOST`、`VPS_USERNAME`、`VPS_PASSWORD`；可选 Variable：`DEPLOY_PATH`（默认 `~/app`）。
+
+Secrets 与 `.env` 中变量一一对应，参见 workflow 内 “Create .env” 步骤。
+
+---
+
+## 使用建议
+
+1. **钱包录入**：先用 `POST /wallet/encrypt` 得到加密后的私钥（及可选助记词），再写入 Supabase `wallets` 表（`private_key_encrypted`、可选 `mnemonic_encrypted`、`address` 等）。
+2. **单钱包测试**：用 `POST /pharos/checkin` 传入一个钱包的 `id`，在 Workbench 或日志中查看全流程与 Telegram 汇总。
+3. **生产**：确认 Cron 时间（`schedule.cron.step.ts` 中 `cron` 表达式）和时区，以及 RPC、API 限流与稳定性。
+
+---
+
+## 技术栈与致谢
+
+- [Motia](https://motia.dev) — 事件驱动与步骤化后端
+- [Supabase](https://supabase.com) — 钱包表存储
+- [ethers](https://docs.ethers.org) — 签名与链上交易
+- Pharos 测试网 — 登录、签到、领水、任务验证等接口
+
+---
+
+## 许可证与贡献
+
+本项目采用 **MIT** 许可证。欢迎提 Issue、PR 或文档改进，使用中遇到问题可先查 [Motia 文档](https://motia.dev/docs) 与仓库内 [AGENTS.md](AGENTS.md)。

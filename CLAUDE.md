@@ -53,9 +53,9 @@ See `AGENTS.md` in this directory for a quick overview and links to specific gui
 ## Key Commands
 
 ```bash
-npm run dev              # Start development server (with hot reload)
-npm run start            # Start production server (without hot reload)
-npx motia generate-types # Regenerate TypeScript types
+bun run dev              # Start development server (with hot reload)
+bun run start            # Start production server (without hot reload)
+bun run generate-types   # Regenerate TypeScript types
 ```
 
 ---

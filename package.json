@@ -7,7 +7,7 @@
     "dev": "motia dev",
     "start": "motia start",
     "compile:motia": "tsc -p tsconfig.motia.json",
-    "generate-types": "npm run compile:motia && motia generate-types",
+    "generate-types": "bun run compile:motia && motia generate-types",
     "build": "motia build",
     "clean": "rm -rf dist node_modules python_modules .motia .mermaid"
   },

@@ -18,16 +18,16 @@ This is a **Motia** application - a framework for building event-driven, type-sa
 
 ```bash
 # Install dependencies
-npm install
+bun install
 
 # Start development server (with hot reload)
-npm run dev
+bun run dev
 
 # Start production server (without hot reload)
-npm run start
+bun run start
 
 # Generate TypeScript types from steps
-npx motia generate-types
+bun run generate-types
 ```
 
 ## 📚 Comprehensive Guides
@@ -185,19 +185,19 @@ When working on Motia projects, follow this pattern:
 
 4. **Generate types** after changes
    ```bash
-   npx motia generate-types
+   bun run generate-types
    ```
 
 5. **Test in Workbench** to verify connections
    ```bash
-   npx motia dev
+   bun run dev
    ```
 
 ## Critical Rules
 
 - **ALWAYS** ensure `package.json` has `"type": "module"` (read `motia-config.mdc` for details)
 - **ALWAYS** read `.cursor/rules/` guides before writing step code
-- **ALWAYS** run `npx motia generate-types` after modifying configs
+- **ALWAYS** run `bun run generate-types` after modifying configs
 - **ALWAYS** list emits in config before using them in handlers
 - **ALWAYS** follow naming conventions (`*.step.ts` or `*_step.py`)
 - **NEVER** use API steps for background work (use Event steps)

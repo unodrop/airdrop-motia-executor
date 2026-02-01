@@ -38,6 +38,26 @@ export function getAddressFromPrivateKey(
   return getAddress(wallet.address)
 }
 
+/** Result of creating a random EVM wallet (ethers HDNodeWallet). */
+export type RandomWalletResult = {
+  address: string
+  privateKey: string
+  mnemonicPhrase: string | null
+}
+
+/**
+ * Create a random EVM wallet (BIP-39 mnemonic + derived key). Returns address, privateKey, mnemonicPhrase.
+ */
+export function createRandomEVMWallet(): RandomWalletResult {
+  const wallet = Wallet.createRandom()
+  const mnemonic = wallet.mnemonic
+  return {
+    address: getAddress(wallet.address),
+    privateKey: wallet.privateKey,
+    mnemonicPhrase: mnemonic?.phrase ?? null,
+  }
+}
+
 /**
  * Get current fee data (gasPrice for legacy, maxFeePerGas / maxPriorityFeePerGas for EIP-1559).
  */

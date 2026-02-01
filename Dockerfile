@@ -5,7 +5,8 @@ FROM motiadev/motia:latest
 # Install unzip (required by bun installer), then Bun
 RUN apt-get update && apt-get install -y --no-install-recommends unzip ca-certificates curl \
   && rm -rf /var/lib/apt/lists/*
-RUN curl -fsSL https://bun.sh/install | bash
+# Pin Bun version to match local lockfile (bun.lock)
+RUN curl -fsSL https://bun.sh/install | bash -s "bun-v1.2.5"
 ENV PATH="/root/.bun/bin:$PATH"
 
 # Install dependencies (production only)

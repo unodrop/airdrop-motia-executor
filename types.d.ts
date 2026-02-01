@@ -16,6 +16,7 @@ declare module 'motia' {
     'PharosSchedule': CronHandler<{ topic: 'pharos-checkin'; data: { id: string } }>
     'PharosCheckIn': EventHandler<{ id: string }, never>
     'WalletEncrypt': ApiRouteHandler<{ private_key?: string; mnemonic?: string }, ApiResponse<200, { encrypted_private_key?: string; encrypted_mnemonic?: string }> | ApiResponse<400, { error: string }> | ApiResponse<503, { error: string }>, never>
+    'WalletCreate': ApiRouteHandler<{ wallet_type: 'evm' | 'solana'; count: unknown }, ApiResponse<200, { created: number; ids: Array<string>; addresses: Array<string> }> | ApiResponse<400, { error: string }> | ApiResponse<503, { error: string }>, never>
   }
     
 }

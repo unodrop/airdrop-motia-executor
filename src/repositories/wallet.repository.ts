@@ -73,3 +73,28 @@ export async function updateWalletUserAgent(id: string, userAgent: string): Prom
     throw new Error(`Supabase update user_agent failed: ${error.message}`)
   }
 }
+
+export type InsertWalletParams = {
+  address: string
+  private_key_encrypted: string
+  mnemonic_encrypted?: string | null
+  user_agent: string
+  chain?: string
+}
+
+/** Insert a new wallet; returns created id. Throws on duplicate address or DB error. */
+export async function insertWallet(params: InsertWalletParams): Promise<string> {
+  const supabase = createSupabaseClient()
+  const row = {
+    address: params.address,
+    private_key_encrypted: params.private_key_encrypted,
+    mnemonic_encrypted: params.mnemonic_encrypted ?? null,
+    user_agent: params.user_agent,
+    chain: params.chain ?? 'evm',
+  }
+  const { data, error } = await supabase.from(WALLETS_TABLE).insert(row).select('id').single()
+  if (error) {
+    throw new Error(`Supabase insert wallet failed: ${error.message}`)
+  }
+  return data.id
+}

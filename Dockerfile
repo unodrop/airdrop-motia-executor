@@ -2,7 +2,9 @@
 # i.e.: AWS Lightsail requires arm64, therefore you update your FROM statement to: FROM --platform=linux/arm64 motiadev/motia:latest
 FROM motiadev/motia:latest
 
-# Install Bun
+# Install unzip (required by bun installer), then Bun
+RUN apt-get update && apt-get install -y --no-install-recommends unzip ca-certificates curl \
+  && rm -rf /var/lib/apt/lists/*
 RUN curl -fsSL https://bun.sh/install | bash
 ENV PATH="/root/.bun/bin:$PATH"
 

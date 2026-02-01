@@ -1,5 +1,5 @@
-# 示例：用 GitHub Secrets 注入环境变量并部署
-# 仓库 Settings → Secrets and variables → Actions 里添加下方用到的 Secrets
+# 根据 .env 环境变量部署
+# 在仓库 Settings → Secrets and variables → Actions 中添加下方用到的 Secrets
 
 name: Build and Deploy
 
@@ -27,15 +27,17 @@ jobs:
           cat >> .env << EOF
           MOTIA_WORKBENCH_AUTH_USER=${{ secrets.MOTIA_WORKBENCH_AUTH_USER }}
           MOTIA_WORKBENCH_AUTH_PASSWORD=${{ secrets.MOTIA_WORKBENCH_AUTH_PASSWORD }}
+          ENCRYPTED_KEY=${{ secrets.ENCRYPTED_KEY }}
+          REDIS_URL=${{ secrets.REDIS_URL }}
+          PHAROS_CHAIN_ID=${{ secrets.PHAROS_CHAIN_ID }}
+          PHAROS_RPC_URL=${{ secrets.PHAROS_RPC_URL }}
+          PHAROS_DOMAIN=${{ secrets.PHAROS_DOMAIN }}
+          PHAROS_API_BASE=${{ secrets.PHAROS_API_BASE }}
+          PHAROS_INVITE_CODE=${{ secrets.PHAROS_INVITE_CODE }}
           SUPABASE_URL=${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          PHAROS_API_BASE=${{ secrets.PHAROS_API_BASE }}
-          PHAROS_APL_BASE=${{ secrets.PHAROS_APL_BASE }}
-          CHECKIN_DELAY_MS=${{ secrets.CHECKIN_DELAY_MS }}
           TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID=${{ secrets.TELEGRAM_CHAT_ID }}
-          REDIS_URL=${{ secrets.REDIS_URL }}
-          ETH_RPC_URL=${{ secrets.ETH_RPC_URL }}
           EOF
 
       - name: Set up Docker Buildx
@@ -51,7 +53,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # 若需推送到 GitHub Container Registry，取消下面注释并配置 Secrets.GITHUB_TOKEN 已有
+      # 若需推送到 GitHub Container Registry，取消下面注释
       # - name: Log in to GHCR
       #   uses: docker/login-action@v3
       #   with:
@@ -61,7 +63,8 @@ jobs:
       # - name: Push image
       #   run: docker tag motia-app:latest ${{ env.REGISTRY }}/${{ github.repository }}:latest && docker push ${{ env.REGISTRY }}/${{ github.repository }}:latest
 
-  # 部署到 VPS：Secrets 里配置 VPS_HOST, VPS_USERNAME, VPS_PASSWORD；Variables 里设 DEPLOY_VPS=true 启用本 job，可选 DEPLOY_PATH（默认 ~/app）
+  # 部署到 VPS：在 Secrets 中配置 VPS_HOST, VPS_USERNAME, VPS_PASSWORD；
+  # 在 Variables 中设 DEPLOY_VPS=true 启用；可选 DEPLOY_PATH（默认 ~/app）
   deploy-vps:
     needs: build
     runs-on: ubuntu-latest
@@ -76,15 +79,17 @@ jobs:
           cat >> .env << EOF
           MOTIA_WORKBENCH_AUTH_USER=${{ secrets.MOTIA_WORKBENCH_AUTH_USER }}
           MOTIA_WORKBENCH_AUTH_PASSWORD=${{ secrets.MOTIA_WORKBENCH_AUTH_PASSWORD }}
+          ENCRYPTED_KEY=${{ secrets.ENCRYPTED_KEY }}
+          REDIS_URL=${{ secrets.REDIS_URL }}
+          PHAROS_CHAIN_ID=${{ secrets.PHAROS_CHAIN_ID }}
+          PHAROS_RPC_URL=${{ secrets.PHAROS_RPC_URL }}
+          PHAROS_DOMAIN=${{ secrets.PHAROS_DOMAIN }}
+          PHAROS_API_BASE=${{ secrets.PHAROS_API_BASE }}
+          PHAROS_INVITE_CODE=${{ secrets.PHAROS_INVITE_CODE }}
           SUPABASE_URL=${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          PHAROS_API_BASE=${{ secrets.PHAROS_API_BASE }}
-          PHAROS_APL_BASE=${{ secrets.PHAROS_APL_BASE }}
-          CHECKIN_DELAY_MS=${{ secrets.CHECKIN_DELAY_MS }}
           TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID=${{ secrets.TELEGRAM_CHAT_ID }}
-          REDIS_URL=${{ secrets.REDIS_URL }}
-          ETH_RPC_URL=${{ secrets.ETH_RPC_URL }}
           EOF
 
       - name: Copy repo and .env to VPS

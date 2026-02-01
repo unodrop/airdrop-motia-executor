@@ -12,8 +12,12 @@ import type {
   PharosFaucetDailyResponse,
 } from '../types'
 
+/** API 请求的 base URL（API 主机地址，可与站点域名不同） */
 const apiBaseUrl = process.env.PHAROS_API_BASE ?? ''
-const pharosOrigin = process.env.PHAROS_ORIGIN ?? 'https://testnet.pharosnetwork.xyz'
+/** 由 PHAROS_DOMAIN 得出，用于请求头 origin/referer（domain = origin） */
+const pharosOrigin = process.env.PHAROS_DOMAIN
+  ? `https://${process.env.PHAROS_DOMAIN.replace(/^https?:\/\//, '')}`
+  : 'https://testnet.pharosnetwork.xyz'
 
 function apiRequestOptions() {
   return { baseURL: apiBaseUrl, timeoutMs: 15_000, retries: 1 }

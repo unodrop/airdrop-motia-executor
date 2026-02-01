@@ -12,8 +12,10 @@ declare module 'motia' {
   }
 
   interface Handlers {
+    'TriggerPharosCheckin': ApiRouteHandler<{ id: string }, ApiResponse<200, { ok: boolean; id: string }> | ApiResponse<400, { error: string }>, { topic: 'pharos-checkin'; data: { id: string } }>
     'PharosSchedule': CronHandler<{ topic: 'pharos-checkin'; data: { id: string } }>
     'PharosCheckIn': EventHandler<{ id: string }, never>
+    'WalletEncrypt': ApiRouteHandler<{ private_key?: string; mnemonic?: string }, ApiResponse<200, { encrypted_private_key?: string; encrypted_mnemonic?: string }> | ApiResponse<400, { error: string }> | ApiResponse<503, { error: string }>, never>
   }
     
 }

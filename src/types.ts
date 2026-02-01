@@ -1,21 +1,17 @@
 /**
- * Shared types: Wallet (Supabase), Pharos API payloads (replace with real API docs).
+ * Shared types: Wallet (Supabase), Pharos API payloads.
  *
- * 新钱包表结构 (wallets):
- * - id (uuid)
- * - address (text, unique)
- * - encrypted_private_key (text) — 存库均为加密，用 WALLET_KEY 解密
- * - is_enabled (boolean, default true) — 仅 is_enabled=true 参与签到
- * - created_at, updated_at (timestamptz)
+ * 表 wallets 见 docs/wallets-schema.sql：
+ * - id, address, private_key_encrypted, mnemonic_encrypted, user_agent, ...
+ * - 应用层读 private_key_encrypted 作 encrypted_private_key；user_agent 明文存储
  */
 
 export type Wallet = {
   id: string
   address: string
-  /** 加密私钥 (AES-256-GCM)，运行时用 WALLET_KEY 解密 */
+  /** 加密私钥（来自 DB private_key_encrypted），运行时用 ENCRYPTED_KEY 解密 */
   encrypted_private_key: string
-  is_enabled: boolean
-  /** 请求 Pharos 时使用的 User-Agent，无则需生成并写回 DB */
+  /** 请求 Pharos 时使用的 User-Agent（DB 明文存储），无则需生成并写回 DB */
   user_agent?: string | null
   created_at?: string
   updated_at?: string
@@ -28,7 +24,7 @@ export type PharosLoginPayload = {
   wallet?: string
   nonce: string
   chain_id: string
-  timestamp: string
+  timestamp?: string
   domain: string
   invite_code?: string
 }
@@ -45,6 +41,16 @@ export type PharosSignInResponse = { code: number; msg?: string }
 
 /** Pharos POST /faucet/daily response: { code, msg }. code !== 0 表示领水失败 */
 export type PharosFaucetDailyResponse = { code: number; msg?: string }
+
+/** Pharos POST /task/verify request body */
+export type PharosVerifyTaskPayload = {
+  task_id: number
+  address: string
+  tx_hash: string
+}
+
+/** Pharos POST /task/verify response: { code, msg }. code 0 = 成功 */
+export type PharosVerifyTaskResponse = { code: number; msg?: string }
 
 /** Pharos GET /user/profile response: { code, data: { user_info }, msg } */
 export type PharosProfileResponse = {

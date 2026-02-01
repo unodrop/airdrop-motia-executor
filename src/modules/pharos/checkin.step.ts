@@ -7,7 +7,7 @@ import {
 } from '../../repositories/wallet.repository'
 import * as ethereum from '../../services/ethereum'
 import * as pharos from '../../services/pharos.client'
-import { sendCheckinResult } from '../../services/notification'
+import { sendPharosFlowResult } from '../../services/notification'
 import { decrypt } from '../../utils/wallet-crypto'
 import { getRandomUserAgent } from '../../utils/ua'
 import { getBalance, sendTransaction } from '../../utils/ethers'
@@ -15,6 +15,7 @@ import { getBalance, sendTransaction } from '../../utils/ethers'
 const PHAROS_LOGIN_MESSAGE = 'pharos'
 const PHAROS_CHAIN_ID = process.env.PHAROS_CHAIN_ID ?? '688689'
 const PHAROS_DOMAIN = process.env.PHAROS_DOMAIN ?? 'testnet.pharosnetwork.xyz'
+const PHAROS_VERIFY_TASK_ID = 401
 const SEND_AMOUNT_ETH = '0.0001'
 const MAX_SEND_RECIPIENTS = 10
 
@@ -49,7 +50,7 @@ export const handler: Handlers['PharosCheckIn'] = async (
   const { id } = input
   const wallet = await getWalletById(id)
   if (!wallet) {
-    logger.warn('Account not found', { id })
+    logger.warn(`Account not found `)
     return
   }
 
@@ -64,14 +65,11 @@ export const handler: Handlers['PharosCheckIn'] = async (
   if (!userAgent) {
     userAgent = getRandomUserAgent()
     await updateWalletUserAgent(wallet.id, userAgent)
-    logger.info('Generated and saved UA for account', { id })
+    logger.info(`Generated and saved UA for account `)
   }
 
   try {
-    logger.info('Pharos check-in: processing', {
-      id,
-      addressPrefix: wallet.address.slice(0, 10) + '...',
-    })
+    logger.info(`Pharos check-in: processing  address: ${wallet.address.slice(0, 10)}...`)
 
     const provider = process.env.PHAROS_RPC_URL
       ? new JsonRpcProvider(process.env.PHAROS_RPC_URL)
@@ -87,42 +85,52 @@ export const handler: Handlers['PharosCheckIn'] = async (
       wallet: 'MetaMask',
       nonce: String(Date.now()),
       chain_id: PHAROS_CHAIN_ID,
-      timestamp: new Date().toISOString(),
       domain: PHAROS_DOMAIN,
       ...(process.env.PHAROS_INVITE_CODE && { invite_code: process.env.PHAROS_INVITE_CODE }),
     }
-    const loginResponse = await pharos.login(loginPayload, userAgent)
-    const token = pharos.extractToken(loginResponse)
+    const pharosClient = new pharos.PharosClient(userAgent)
+    const loginResponse = await pharosClient.login(loginPayload)
+    logger.info(`Pharos login  ${JSON.stringify({ code: loginResponse.code, msg: loginResponse.msg })}`)
+    const token = pharos.PharosClient.extractToken(loginResponse)
 
-    await pharos.signIn(token, wallet.address, userAgent)
-    const profileResponse = await pharos.getProfile(token, wallet.address, userAgent)
-    const userInfo = profileResponse.data?.user_info
-    const points = userInfo?.TotalPoints
-    const hasBoundX = Boolean(userInfo?.XId)
+    let signInOk = false
+    try {
+      const signInRes = await pharosClient.signIn(token, wallet.address)
+      signInOk = true
+      logger.info(`Pharos 签到  ${JSON.stringify({ code: signInRes.code, msg: signInRes.msg })}`)
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error)
+      logger.warn(`Pharos 签到 failed address: ${wallet.address} msg: ${msg}`)
+    }
 
-    let claimSucceeded: boolean | undefined
+    let points: number | undefined
+    let hasBoundX = false
+    try {
+      const profileResponse = await pharosClient.getProfile(token, wallet.address)
+      const userInfo = profileResponse.data?.user_info
+      points = userInfo?.TotalPoints
+      hasBoundX = Boolean(userInfo?.XId)
+      logger.info(`Pharos profile  ${JSON.stringify({ code: profileResponse.code, msg: profileResponse.msg, points, hasBoundX })}`)
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error)
+      logger.warn(`Pharos profile failed address: ${wallet.address} msg: ${msg}`)
+    }
 
+    let claimOk: boolean | undefined
     if (hasBoundX) {
       try {
-        await pharos.claimFaucetDaily(token, wallet.address, userAgent)
-        claimSucceeded = true
+        const claimRes = await pharosClient.claimFaucetDaily(token, wallet.address)
+        claimOk = true
+        logger.info(`Pharos 领水  ${JSON.stringify({ code: claimRes.code, msg: claimRes.msg })}`)
       } catch (error) {
-        logger.warn('领水 failed', { id, error: String(error) })
-        claimSucceeded = false
+        const msg = error instanceof Error ? error.message : String(error)
+        logger.warn(`Pharos 领水 failed address: ${wallet.address} msg: ${msg}`)
+        claimOk = false
       }
     }
 
-    const shouldNotify = !hasBoundX || claimSucceeded === true
-    if (shouldNotify) {
-      await sendCheckinResult({
-        address: wallet.address,
-        success: true,
-        points,
-        message: hasBoundX
-          ? (claimSucceeded ? '领水 OK' : '领水 failed')
-          : 'Check-in OK (X not bound)',
-      })
-    }
+    let sendTxCount = 0
+    let verifyOkCount = 0
 
     if (provider) {
       const balanceWei = await getBalance(wallet.address, provider)
@@ -131,43 +139,90 @@ export const handler: Handlers['PharosCheckIn'] = async (
         Wallet.createRandom().address
       )
       if (balanceWei >= amountWei) {
-        let sentCount = 0
         for (const to of recipients) {
-          if (sentCount >= MAX_SEND_RECIPIENTS) break
+          if (sendTxCount >= MAX_SEND_RECIPIENTS) break
           try {
-            await sendTransaction(to, amountWei, privateKey, provider)
-            sentCount++
-            logger.info('Send ETH', { id, to: to.slice(0, 10) + '...', amount: SEND_AMOUNT_ETH })
+            const txResponse = await sendTransaction(to, amountWei, privateKey, provider)
+            sendTxCount++
+            const txHash = txResponse?.hash
+            logger.info(`Send ETH  to:${to.slice(0, 10)}... amount: ${SEND_AMOUNT_ETH} txHash: ${txHash}`)
+            if (txHash) {
+              logger.info(`Waiting for tx confirmation  txHash: ${txHash}`)
+              const receipt = await txResponse.wait(1)
+              if (receipt) {
+                logger.info(`Tx confirmed  txHash: ${txHash} blockNumber: ${receipt.blockNumber}`)
+                const verifyRes = await pharosClient.verifyTask(
+                  token,
+                  { task_id: PHAROS_VERIFY_TASK_ID, address: wallet.address, tx_hash: txHash }
+                )
+                const verifySuccess = verifyRes.code === 0
+                const verifyResult = {
+                  success: verifySuccess,
+                  code: verifyRes.code,
+                  msg: verifyRes.msg,
+                }
+                logger.info(`验证结果  txHash: ${txHash} ${JSON.stringify(verifyResult)}`)
+                if (verifySuccess) {
+                  verifyOkCount++
+                } else {
+                  logger.warn(`验证任务未通过  txHash: ${txHash} ${JSON.stringify(verifyResult)}`)
+                }
+              } else {
+                logger.warn(`Tx wait returned no receipt  txHash: ${txHash}`)
+              }
+            }
           } catch (err) {
-            logger.warn('Send ETH failed', { id, to: to.slice(0, 10) + '...', error: String(err) })
+            const errMsg = err instanceof Error ? err.message : String(err)
+            logger.warn(`Send ETH failed address: ${wallet.address} to: ${to.slice(0, 10)}... msg: ${errMsg}`)
             break
           }
         }
-        if (sentCount > 0) {
-          logger.info('Send ETH done', { id, sentCount, amountPerRecipient: SEND_AMOUNT_ETH })
+        if (sendTxCount > 0) {
+          logger.info(`Send ETH done  sendTxCount: ${sendTxCount} verifyOkCount: ${verifyOkCount}`)
         }
       }
     }
 
-    logger.info('Pharos check-in done', {
-      id,
-      hasBoundX,
+    // 签到、发交易、验证后重新拉取积分，保证上报的是最新值
+    try {
+      const profileRes = await pharosClient.getProfile(token, wallet.address)
+      if (profileRes.code === 0 && profileRes.data?.user_info) {
+        points = profileRes.data.user_info.TotalPoints
+        logger.info(`Pharos profile（最新积分）  ${JSON.stringify({ points, msg: profileRes.msg })}`)
+      }
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error)
+      logger.warn(`Pharos profile（最新积分）failed address: ${wallet.address} msg: ${msg}`)
+    }
+
+    await sendPharosFlowResult({
+      address: wallet.address,
+      success: true,
+      loginOk: true,
+      signInOk,
       points,
-      traceId,
+      hasBoundX,
+      claimOk,
+      sendTxCount: sendTxCount > 0 ? sendTxCount : undefined,
+      verifyOkCount: verifyOkCount > 0 ? verifyOkCount : undefined,
+      verifyTotal: sendTxCount > 0 ? sendTxCount : undefined,
+    }    ).catch((sendError) => {
+      const msg = sendError instanceof Error ? sendError.message : String(sendError)
+      logger.warn(`Send flow result failed msg: ${msg}`)
     })
+
+    logger.info(`Pharos check-in done  ${JSON.stringify({ signInOk, hasBoundX, points, sendTxCount, verifyOkCount, traceId })}`)
   } catch (error) {
-    logger.error('Pharos check-in failed', {
-      id,
-      error: String(error),
-      traceId,
-    })
-    await sendCheckinResult({
+    const errMsg = error instanceof Error ? error.message : String(error)
+    logger.error(`Pharos check-in failed address: ${wallet.address} traceId: ${traceId} msg: ${errMsg}`)
+    await sendPharosFlowResult({
       address: wallet.address,
       success: false,
-      message: String(error),
-    }).catch((sendError) =>
-      logger.warn('Send check-in result failed', { error: String(sendError) })
-    )
+      error: errMsg,
+    }).catch((sendError) => {
+      const msg = sendError instanceof Error ? sendError.message : String(sendError)
+      logger.warn(`Send flow result failed msg: ${msg}`)
+    })
   }
 
   await new Promise<void>((resolve) => setTimeout(resolve, delayMillis))

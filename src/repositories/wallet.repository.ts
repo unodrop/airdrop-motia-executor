@@ -1,7 +1,6 @@
 /**
- * Wallet repository — 适配新钱包表结构。
- * 表 wallets: id, address, encrypted_private_key, is_enabled, user_agent, created_at, updated_at
- * listEnabledWallets returns only is_enabled = true; used by Pharos check-in schedule.
+ * Wallet repository — 适配 docs/wallets-schema.sql。
+ * 表列：id, address, private_key_encrypted, user_agent（明文）, created_at, updated_at 等
  */
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
@@ -18,13 +17,12 @@ function createSupabaseClient(): SupabaseClient {
   return createClient(url, serviceRoleKey)
 }
 
-/** List wallets with is_enabled = true for scheduled check-in. */
+/** List all wallets for scheduled check-in（表无 is_enabled 时全部参与）. */
 export async function listEnabledWallets(): Promise<Wallet[]> {
   const supabase = createSupabaseClient()
   const { data, error } = await supabase
     .from(WALLETS_TABLE)
-    .select('id, address, encrypted_private_key, is_enabled, user_agent, created_at, updated_at')
-    .eq('is_enabled', true)
+    .select('id, address, private_key_encrypted, user_agent, created_at, updated_at')
     .order('created_at', { ascending: true })
 
   if (error) {
@@ -34,8 +32,7 @@ export async function listEnabledWallets(): Promise<Wallet[]> {
   return (data ?? []).map((row) => ({
     id: row.id,
     address: row.address,
-    encrypted_private_key: row.encrypted_private_key,
-    is_enabled: row.is_enabled ?? true,
+    encrypted_private_key: row.private_key_encrypted,
     user_agent: row.user_agent ?? undefined,
     created_at: row.created_at,
     updated_at: row.updated_at,
@@ -46,23 +43,26 @@ export async function getWalletById(id: string): Promise<Wallet | null> {
   const supabase = createSupabaseClient()
   const { data, error } = await supabase
     .from(WALLETS_TABLE)
-    .select('id, address, encrypted_private_key, is_enabled, user_agent, created_at, updated_at')
+    .select('id, address, private_key_encrypted, user_agent, created_at, updated_at')
     .eq('id', id)
     .single()
 
-  if (error || !data) return null
+  if (error) {
+    console.warn('[wallet.repository] getWalletById error', { id, code: error.code, message: error.message })
+    return null
+  }
+  if (!data) return null
   return {
     id: data.id,
     address: data.address,
-    encrypted_private_key: data.encrypted_private_key,
-    is_enabled: data.is_enabled ?? true,
+    encrypted_private_key: data.private_key_encrypted,
     user_agent: data.user_agent ?? undefined,
     created_at: data.created_at,
     updated_at: data.updated_at,
   } as Wallet
 }
 
-/** 绑定钱包的 User-Agent，生成后需调用此方法持久化 */
+/** 绑定钱包的 User-Agent，明文写入 user_agent */
 export async function updateWalletUserAgent(id: string, userAgent: string): Promise<void> {
   const supabase = createSupabaseClient()
   const { error } = await supabase

@@ -94,6 +94,8 @@ PHAROS_RPC_URL=https://your-pharos-rpc
 PHAROS_DOMAIN=testnet.pharosnetwork.xyz
 PHAROS_API_BASE=https://api.pharosnetwork.xyz
 PHAROS_INVITE_CODE=your_invite_code
+# 定时签到：每个钱包执行间隔（毫秒），防限流，默认 30000
+# PHAROS_ACCOUNT_INTERVAL_MS=30000
 
 # Supabase
 SUPABASE_URL=https://xxx.supabase.co

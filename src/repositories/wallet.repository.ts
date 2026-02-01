@@ -17,13 +17,24 @@ function createSupabaseClient(): SupabaseClient {
   return createClient(url, serviceRoleKey)
 }
 
-/** List all wallets for scheduled check-in（表无 is_enabled 时全部参与）. */
-export async function listEnabledWallets(): Promise<Wallet[]> {
+export type ListEnabledWalletsOptions = {
+  /** 仅返回该链类型，如 'evm'（Pharos 等仅支持 EVM） */
+  chain?: 'evm'
+}
+
+/** List wallets for scheduled check-in. 可选按 chain 筛选（如 chain: 'evm'）. */
+export async function listEnabledWallets(
+  options?: ListEnabledWalletsOptions
+): Promise<Wallet[]> {
   const supabase = createSupabaseClient()
-  const { data, error } = await supabase
+  let q = supabase
     .from(WALLETS_TABLE)
     .select('id, address, private_key_encrypted, user_agent, created_at, updated_at')
     .order('created_at', { ascending: true })
+  if (options?.chain) {
+    q = q.eq('chain', options.chain)
+  }
+  const { data, error } = await q
 
   if (error) {
     throw new Error(`Supabase wallets list failed: ${error.message}`)

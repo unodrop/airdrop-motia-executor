@@ -11,6 +11,7 @@
 - **单步容错**：签到/领水/拉 profile 失败不阻塞后续步骤，失败原因用接口返回的 `msg` 打日志
 - **定时与手动**：Cron 每日定时为所有钱包执行签到；支持 HTTP 接口手动触发指定钱包
 - **Telegram 通知**：全流程结束后发送一条汇总消息（登录、签到、积分、领水、发交易笔数、验证结果）
+- **定投提醒**：黄金/美股（纳指、标普）收盘前 10 分钟拉价、均线+RSI 分析、是否适合定投推送到 Telegram；支持手动触发 `POST /dca/gold`、`POST /dca/us-indices`，见 [docs/dca-reminder.md](docs/dca-reminder.md)
 - **Workbench**：Motia 自带可视化与日志，便于调试与观察流程
 
 ---
@@ -20,6 +21,7 @@
 | 路径 | 说明 |
 |------|------|
 | [docs/wallets-schema.sql](docs/wallets-schema.sql) | 钱包表结构（PostgreSQL/Supabase），含加密列说明与索引 |
+| [docs/dca-reminder.md](docs/dca-reminder.md) | 定投提醒：标的、时区、Cron、判断规则与环境变量 |
 | [.github/workflows/deploy.yml](.github/workflows/deploy.yml) | CI：用 Secrets 生成 .env、构建镜像、可选部署到 VPS |
 | [AGENTS.md](AGENTS.md) | 面向 AI 助手的 Motia 项目说明与规则索引 |
 | [.cursor/rules/](.cursor/rules/) | Motia 步骤、API、Event、Cron 等开发规范（可选阅读） |
@@ -34,11 +36,16 @@ src/
 │   ├── checkin.step.ts         # 签到事件处理（登录、签到、领水、发交易、验证、通知）
 │   ├── schedule.cron.step.ts   # 定时触发（每日）
 │   └── trigger-checkin.step.ts # POST /pharos/checkin 手动触发
+├── modules/dca/            # 定投提醒（黄金、纳指、标普）
+│   ├── gold-schedule.cron.step.ts / gold-dca-analyze.step.ts
+│   └── us-indices-schedule.cron.step.ts / us-indices-dca-analyze.step.ts
 ├── repositories/          # 数据访问
 │   └── wallet.repository.ts
 ├── services/              # 业务与外部 API
 │   ├── pharos.client.ts       # Pharos API 封装（登录、签到、profile、领水、verifyTask）
-│   ├── notification.ts        # Telegram 汇总消息
+│   ├── notification.ts        # Telegram 汇总与定投提醒推送
+│   ├── market.ts              # Yahoo 行情（历史、报价、MA/RSI）
+│   ├── dca-indicator.ts       # 定投适合性判断（均线+RSI）
 │   └── ethereum.ts
 └── utils/                 # 通用工具（HTTP、ethers、加解密、UA、Telegram）
 ```

@@ -78,3 +78,24 @@ export type PharosUserInfo = {
   CreateTime?: string
   UpdateTime?: string
 }
+
+/** 定投提醒：单标的分析结果 */
+export type DCAAnalysisResult = {
+  symbol: string
+  /** 显示名称，如 黄金/纳指/标普 */
+  label: string
+  price: number
+  ma20?: number
+  ma60?: number
+  rsi?: number
+  /** 是否适合定投 */
+  suitable: boolean
+  /** 简短原因 */
+  reason?: string
+}
+
+/** 定投提醒推送 payload（黄金单条 或 美股纳指+标普合并） */
+export type DCAAlertPayload = {
+  market: 'gold' | 'us'
+  results: DCAAnalysisResult[]
+}

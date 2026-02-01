@@ -15,6 +15,12 @@ declare module 'motia' {
     'TriggerPharosCheckin': ApiRouteHandler<{ id: string }, ApiResponse<200, { ok: boolean; id: string }> | ApiResponse<400, { error: string }>, { topic: 'pharos-checkin'; data: { id: string } }>
     'PharosSchedule': CronHandler<{ topic: 'pharos-checkin'; data: { id: string } }>
     'PharosCheckIn': EventHandler<{ id: string }, never>
+    'USIndicesSchedule': CronHandler<{ topic: 'us-indices-dca-analyze'; data: {} }>
+    'USIndicesDCAAnalyze': EventHandler<{}, never>
+    'TriggerUSIndicesDCA': ApiRouteHandler<Record<string, unknown>, ApiResponse<200, { ok: boolean; topic: string }>, { topic: 'us-indices-dca-analyze'; data: {} }>
+    'TriggerGoldDCA': ApiRouteHandler<Record<string, unknown>, ApiResponse<200, { ok: boolean; topic: string }>, { topic: 'gold-dca-analyze'; data: {} }>
+    'GoldSchedule': CronHandler<{ topic: 'gold-dca-analyze'; data: {} }>
+    'GoldDCAAnalyze': EventHandler<{}, never>
     'WalletEncrypt': ApiRouteHandler<{ private_key?: string; mnemonic?: string }, ApiResponse<200, { encrypted_private_key?: string; encrypted_mnemonic?: string }> | ApiResponse<400, { error: string }> | ApiResponse<503, { error: string }>, never>
     'WalletCreate': ApiRouteHandler<{ wallet_type: 'evm' | 'solana'; count: unknown }, ApiResponse<200, { created: number; ids: Array<string>; addresses: Array<string> }> | ApiResponse<400, { error: string }> | ApiResponse<503, { error: string }>, never>
   }

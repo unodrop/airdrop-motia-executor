@@ -3,6 +3,7 @@
  */
 
 import { sendMessage, getDefaultChatId } from '../utils/telegram'
+import type { DCAAlertPayload } from '../types'
 
 export type CheckinResultPayload = {
   address: string
@@ -96,4 +97,40 @@ export async function sendPharosFlowResult(
   }
 
   await sendMessage(targetChatId, lines.join('\n'), { parse_mode: undefined })
+}
+
+/** 转义 HTML 特殊字符，避免破坏 Telegram parse_mode=HTML */
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+/**
+ * 发送定投提醒到 Telegram。黄金单条或美股纳指+标普合并一条。
+ * 使用 HTML 格式：标题加粗、指标一行、结论加粗，便于扫读。
+ */
+export async function sendDCAAlert(
+  payload: DCAAlertPayload,
+  chatId?: string
+): Promise<void> {
+  const targetChatId = chatId ?? getDefaultChatId()
+  if (!targetChatId) {
+    throw new Error('TELEGRAM_CHAT_ID is not set and no chatId was passed')
+  }
+
+  const title =
+    payload.market === 'gold' ? '<b>黄金 定投提醒</b>' : '<b>美股 定投提醒</b>'
+  const blocks: string[] = [title]
+
+  for (const r of payload.results) {
+    const parts: string[] = [r.label, r.price.toFixed(2)]
+    if (r.ma20 != null) parts.push(`MA20 ${r.ma20.toFixed(2)}`)
+    if (r.ma60 != null) parts.push(`MA60 ${r.ma60.toFixed(2)}`)
+    if (r.rsi != null) parts.push(`RSI ${r.rsi.toFixed(0)}`)
+    blocks.push(parts.join(' · '))
+    const conclusion = r.suitable ? '适合定投' : '暂不适合'
+    const reason = r.reason ? ` ${escapeHtml(r.reason)}` : ''
+    blocks.push(`<b>${conclusion}</b>${reason}`)
+  }
+
+  await sendMessage(targetChatId, blocks.join('\n'), { parse_mode: 'HTML' })
 }

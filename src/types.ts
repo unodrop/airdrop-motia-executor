@@ -85,6 +85,8 @@ export type DCAAnalysisResult = {
   /** 显示名称，如 黄金/纳指/标普 */
   label: string
   price: number
+  /** 当日涨跌幅（百分比），如 1.5 表示 +1.5% */
+  changePercent?: number
   ma20?: number
   ma60?: number
   rsi?: number

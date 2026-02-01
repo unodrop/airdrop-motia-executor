@@ -1,6 +1,6 @@
 import { EventConfig, Handlers } from 'motia'
 import { z } from 'zod'
-import { getHistorical, getQuote, computeMA, computeRSI } from '../../services/market'
+import { getHistorical, getQuoteWithChange, computeMA, computeRSI } from '../../services/market'
 import { isSuitableForDCA } from '../../services/dca-indicator'
 import { sendDCAAlert } from '../../services/notification'
 import type { DCAAnalysisResult } from '../../types'
@@ -38,18 +38,14 @@ export const handler: Handlers['GoldDCAAnalyze'] = async (
     const ma20 = computeMA(closesChronological, 20)
     const ma60 = computeMA(closesChronological, 60)
     const rsi = computeRSI(closesChronological, 14)
-    let price: number
-    try {
-      price = await getQuote(GOLD_SYMBOL)
-    } catch {
-      price = bars[0]!.close
-    }
+    const { price, changePercent } = await getQuoteWithChange(GOLD_SYMBOL, bars)
 
     const verdict = isSuitableForDCA(price, ma20, ma60, rsi)
     const result: DCAAnalysisResult = {
       symbol: GOLD_SYMBOL,
       label: '黄金',
       price,
+      changePercent,
       ma20,
       ma60,
       rsi,

@@ -123,6 +123,10 @@ export async function sendDCAAlert(
 
   for (const r of payload.results) {
     const parts: string[] = [r.label, r.price.toFixed(2)]
+    if (r.changePercent != null) {
+      const sign = r.changePercent >= 0 ? '+' : ''
+      parts.push(`涨跌 ${sign}${r.changePercent.toFixed(2)}%`)
+    }
     if (r.ma20 != null) parts.push(`MA20 ${r.ma20.toFixed(2)}`)
     if (r.ma60 != null) parts.push(`MA60 ${r.ma60.toFixed(2)}`)
     if (r.rsi != null) parts.push(`RSI ${r.rsi.toFixed(0)}`)

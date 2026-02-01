@@ -50,6 +50,32 @@ export async function getQuote(symbol: string): Promise<number> {
 }
 
 /**
+ * Get price and same-day change %: prefer quote (regularMarketPrice + regularMarketChangePercent), fallback to historical.
+ * bars: most recent first; if length >= 2, changePercent = (latest - prevClose) / prevClose * 100.
+ */
+export async function getQuoteWithChange(
+  symbol: string,
+  fallbackBars?: DailyBar[]
+): Promise<{ price: number; changePercent?: number }> {
+  try {
+    const q = await yahoo.quote(symbol)
+    const p = (q as { regularMarketPrice?: number }).regularMarketPrice
+    const cp = (q as { regularMarketChangePercent?: number }).regularMarketChangePercent
+    if (p != null && typeof p === 'number') {
+      return { price: p, changePercent: cp != null && typeof cp === 'number' ? cp : undefined }
+    }
+  } catch {
+    // fallback
+  }
+  const bars = fallbackBars ?? (await getHistorical(symbol, 5))
+  if (bars.length === 0) throw new Error(`No price data for ${symbol}`)
+  const price = bars[0].close
+  const changePercent =
+    bars.length >= 2 ? ((bars[0].close - bars[1].close) / bars[1].close) * 100 : undefined
+  return { price, changePercent }
+}
+
+/**
  * Compute simple moving average of the last `period` closes.
  * Expects closes in chronological order (oldest first). Returns undefined if not enough data.
  */
